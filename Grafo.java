@@ -1,186 +1,75 @@
 import java.util.*;
 
-public class Grafo{
+public class Grafo<T> {
+    private ArrayList<ArrayList<Arista<T>>> adyacencia = new ArrayList<>();
 
-    private HashMap<String, Vertice> vertices;
-    private HashMap<Integer, Arista> aristas;
-
-    /**
-     * Construcción de un grafo vacío
-     **/
-    public Grafo()
-    {
-	this.vertices = new HashMap<String, Vertice>();
-	this.aristas = new HashMap<Integer, Arista>();
+    public Grafo(int vertices) {
+        for (int i = 0; i < vertices; i++) {
+            adyacencia.add(new ArrayList<>());
+        }
     }
 
-
-    /**
-     *@param vertices. Array de lista usado para llenar el grafo
-     **/
-    public Grafo(ArrayList<Vertice> vertices)
-    {
-	this.vertices = new HashMap<String, Vertice>();
-	this.aristas = new HashMap<Integer, Arista>();
-
-	for(Vertice v : vertices )
-	    {
-		this.vertices.put(v.getEtiqueta(), v);
-	    }
-	
+    public void agregarArista(int origen, int destino, int peso) {
+        adyacencia.get(origen).add(new Arista<>(destino, peso));
     }
 
-
-    /**
-     * Inserta una arista unitaria entre los vertices v1 y v2
-     * si y solo si no exista ya una arista que los una
-     *
-     * @param v1. Un extremo de la arista
-     * @param v2. Otro extremo de la arista
-     * @return true. Si y solo si la arista no existe previamente
-     **/
-    public boolean insertarArista(Vertice v1, Vertice v2)
-    {
-      	return insertarArista(v1, v2, 1);
+    public void imprimirListaAdyacencia() {
+        char vertice = 'A';
+        for (int i = 0; i < adyacencia.size(); i++) {
+            System.out.print("Vértice " + (char)(vertice + i) + " -> ");
+            for (Arista<T> arista : adyacencia.get(i)) {
+                System.out.print((char)(vertice + arista.destino) + " (peso: " + arista.peso + ") ");
+            }
+            System.out.println();
+        }
     }
 
-    
-    /**
-     * Inserta una arista entre los vertices v1 y v2
-     * y un coste o peso especificado por parámetro de entrada. 
-     * La arista se insertará con éxito siempre que sea única y además
-     * no haya otra uniendo actualmente v1 y v2. Finalmente v1 y v2 no
-     * deben ser el mismo vértice (v1 != v2)
-     *
-     * @param v1. Un extremo de la arista
-     * @param v2. Otro extremo de la arista
-     * @param peso. Coste para llegar de v1 a v2 o viceversa
-     * @return true. Si y solo si la arista no existe previamente
-     **/
-    public boolean insertarArista(Vertice v1, Vertice v2, int peso)
-    {
-	if(v1.equals(v2)) //vertices identicos?
-	    return false;
+    private int distanciaMinima(int[] distancias, boolean[] visitado) {
+        int min = Integer.MAX_VALUE, min_index = -1;
 
-	Arista arista = new Arista(v1, v2, peso);
+        for (int v = 0; v < distancias.length; v++) {
+            if (!visitado[v] && distancias[v] <= min) {
+                min = distancias[v];
+                min_index = v;
+            }
+        }
 
-	if(aristas.containsKey(arista.hashCode())) //arista ya está en el grafo?
-	    return false;
-	else if( v1.contieneUnVecino(arista) || v2.contieneUnVecino(arista)) //arista ya une a v1 o v2?
-	    return false;
-
-	aristas.put(arista.hashCode(), arista);
-	v1.insertarVecino(arista);
-	v2.insertarVecino(arista);
-	return true;
+        return min_index;
     }
 
-    /** 
-     * @param arista. Arista que estamos buscando
-     * @return true. Si y solo si el grafo contiene a la arista
-     **/
-    public boolean contieneLaArista(Arista arista)
-    {
-	if(arista.getVertice1() == null || arista.getVertice2() == null)
-	    return false;
-	return this.aristas.containsKey(arista.hashCode());
+    public ArrayList<Integer> dijkstra(int origen, int destino) {
+        int V = adyacencia.size();
+        int[] distancias = new int[V];
+        int[] padres = new int[V]; // Para reconstruir la ruta mínima
+        boolean[] visitado = new boolean[V];
+        Arrays.fill(distancias, Integer.MAX_VALUE);
+        Arrays.fill(padres, -1);
+        distancias[origen] = 0;
+
+        for (int count = 0; count < V - 1; count++) {
+            int u = distanciaMinima(distancias, visitado);
+            visitado[u] = true;
+
+            for (Arista<T> arista : adyacencia.get(u)) {
+                if (!visitado[arista.destino] && distancias[u] != Integer.MAX_VALUE &&
+                        distancias[u] + arista.peso < distancias[arista.destino]) {
+                    distancias[arista.destino] = distancias[u] + arista.peso;
+                    padres[arista.destino] = u; // Actualizar el padre para reconstruir la ruta
+                }
+            }
+        }
+
+        return reconstruirRuta(padres, origen, destino);
     }
 
-
-    /**
-     * Elimina una arista del grafo. Por tanto, los vertices que unían
-     * pierden la adyacencia entre ellos
-     *
-     *@param arista. Arista que se quiere eliminar del grafo
-     *@return Arista. Arista borrada del grafo
-     */
-    public Arista eliminarArista(Arista arista)
-    {
-	arista.getVertice1().eliminarVecino(arista);
-	arista.getVertice2().eliminarVecino(arista);
-	return this.aristas.remove(arista.hashCode());
+    private ArrayList<Integer> reconstruirRuta(int[] padres, int origen, int destino) {
+        ArrayList<Integer> ruta = new ArrayList<>();
+        int actual = destino;
+        while (actual != -1) {
+            ruta.add(actual);
+            actual = padres[actual];
+        }
+        Collections.reverse(ruta);
+        return ruta;
     }
-
-    /**
-     * Nos devuelve true si encuentra el vértice que se pasa
-     * como parámetro de entrada
-     * 
-     * @param vertice. Vértice que buscamos
-     * @return boolean. True si el vertice se encuentra.
-     **/    
-    public boolean contieneElVertice(Vertice vertice)
-    {
-	return (this.vertices.get(vertice.getEtiqueta()) != null);
-    }
-
-    /**
-     * @param etiqueta. Distintivo de cada vértice
-     * @return Vertice. Devuelve el vértice asociado a la etiqueta
-     **/
-    public Vertice getVertice(String etiqueta)
-    {
-	return this.vertices.get(etiqueta);
-    }
-
-    /**
-     * Inserta un nuevo vértice. Si el vértice existe previamente entonces
-     * se consulta si puede ser sobreescrito. En tal caso se elimina las adyacencias
-     * existentes.
-     *
-     * @param vertice. Vértice a insertar
-     * @param sobreescribeVertice. Permiso para sobreescribir el vértice
-     * @return boolean. Verdarero si el vértice se inserta con éxito
-     **/
-    public boolean insertarVertice(Vertice vertice, boolean sobreescribeVertice)
-    {
-	Vertice actual = this.vertices.get(vertice.getEtiqueta());
-	if(actual != null) //existía previamente?
-	    {
-		if(!sobreescribeVertice)
-		    return false;
-
-		while(actual.getContarVecinos() >= 0)
-		    this.eliminarArista(actual.getVecino(0));
-		
-	    }
-
-	vertices.put(vertice.getEtiqueta(), vertice);
-	return true;
-    }
-
-    /**
-     * Elimina el vértice especificado mediante la etiqueta
-     * distintiva por parámetro de entrada. Al eliminar el vértice
-     * se elimina también todas las adyancencias que poseía este.
-     *
-     * @param etiqueta. Cadena distintiva de cada vértice
-     * @return Vertice. Devuelve el vértice eliminado
-     **/
-    public Vertice eliminarVertice(String etiqueta)
-    {
-	Vertice vertice = vertices.remove(etiqueta);
-
-	while(vertice.getContarVecinos() >= 0)
-	    this.eliminarArista(vertice.getVecino(0));
-
-	return vertice;
-    }
-
-    /**
-     * @return Set<String>. Devuelve las etiquetas, que son el distintivo
-     * único de cada objeto Vertice en el Grafo
-     **/
-    public Set<String> verticeKeys()
-    {
-	return this.vertices.keySet();
-    }
-
-    /**
-     * @return Set<Arista>. Devuelve todos los objetos Arista del Grafo
-     **/
-    public Set<Arista> getAristas()
-    {
-	return new HashSet<Arista>(this.aristas.values());
-    }
-    
 }
